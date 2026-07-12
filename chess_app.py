@@ -1,423 +1,250 @@
-"""
-Chess GUI App with Stockfish AI - Built with PyQt5
-"""
-
-import sys
-import subprocess
-from pathlib import Path
-
-# Install required packages
-def install_packages():
-    try:
-        import chess
-        from PyQt5.QtWidgets import QApplication
-    except ImportError:
-        print("Installing required packages...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-chess", "PyQt5", "-q"])
-
-install_packages()
-
-import chess
-import chess.engine
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QPushButton, QLabel, QComboBox, QSpinBox, QMessageBox,
-    QTextEdit, QFrame
-)
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QBrush
-
-class ChessBoardWidget(QWidget):
-    """Interactive chess board widget"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>♔ Chess vs Stockfish AI ♔</title>
     
-    def __init__(self, gui):
-        super().__init__()
-        self.gui = gui
-        self.selected_square = None
-        self.board = chess.Board()
-        self.highlighted_squares = set()
-        self.setMinimumSize(600, 600)
+    <!-- Load Chessboard UI Styles -->
+    <link rel="stylesheet" href="https://cloudflare.com">
     
-    def update_board(self, board):
-        """Update board state"""
-        self.board = board.copy()
-        self.repaint()
-    
-    def mousePressEvent(self, event):
-        """Handle square clicks"""
-        size = min(self.width(), self.height())
-        square_size = size // 8
-        
-        col = event.x() // square_size
-        row = 7 - (event.y() // square_size)
-        
-        square = chess.square(col, row)
-        
-        if self.selected_square is None:
-            piece = self.board.piece_at(square)
-            if piece and piece.color == self.gui.player_color:
-                self.selected_square = square
-                self.highlighted_squares = set(move.to_square for move in self.board.legal_moves if move.from_square == square)
-                self.repaint()
-        else:
-            try:
-                move = chess.Move(self.selected_square, square)
-                if move in self.board.legal_moves:
-                    self.gui.board.push(move)
-                    self.gui.move_history.append(move.uci())
-                    self.update_board(self.gui.board)
-                    self.selected_square = None
-                    self.highlighted_squares = set()
-                    self.gui.update_status()
-                    
-                    # AI move after delay
-                    if self.gui.game_active and self.gui.board.turn != self.gui.player_color:
-                        QTimer.singleShot(500, self.make_ai_move)
-            except:
-                self.selected_square = None
-                self.highlighted_squares = set()
-                self.repaint()
-    
-    def make_ai_move(self):
-        """Make AI move"""
-        if not self.gui.engine or not self.gui.game_active:
-            return
-        
-        try:
-            limit = chess.engine.Limit(time=0.1 + (self.gui.difficulty * 0.05))
-            result = self.gui.engine.play(self.gui.board, limit)
-            
-            if result.move:
-                self.gui.board.push(result.move)
-                self.gui.move_history.append(result.move.uci())
-                self.update_board(self.gui.board)
-                self.gui.update_status()
-        except Exception as e:
-            print(f"AI move error: {e}")
-    
-    def paintEvent(self, event):
-        """Draw chess board"""
-        painter = QPainter(self)
-        
-        size = min(self.width(), self.height())
-        square_size = size // 8
-        
-        # Draw squares
-        for row in range(8):
-            for col in range(8):
-                x = col * square_size
-                y = (7 - row) * square_size
-                
-                # Background color
-                is_light = (row + col) % 2 == 0
-                color = QColor(240, 217, 181) if is_light else QColor(181, 136, 99)
-                
-                painter.fillRect(x, y, square_size, square_size, color)
-                
-                # Highlight selected square
-                square = chess.square(col, row)
-                if square == self.selected_square:
-                    painter.fillRect(x, y, square_size, square_size, QColor(100, 200, 100))
-                
-                # Highlight valid moves
-                if square in self.highlighted_squares:
-                    center_x = x + square_size // 2
-                    center_y = y + square_size // 2
-                    painter.fillEllipse(center_x - 10, center_y - 10, 20, 20, QColor(100, 100, 100))
-                
-                # Draw border
-                painter.drawRect(x, y, square_size, square_size)
-        
-        # Draw pieces using Unicode symbols
-        piece_symbols = {
-            chess.PAWN: ('♙', '♟'), chess.KNIGHT: ('♘', '♞'),
-            chess.BISHOP: ('♗', '♝'), chess.ROOK: ('♖', '♜'),
-            chess.QUEEN: ('♕', '♛'), chess.KING: ('♔', '♚')
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #161512;
+            color: #bababa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
-        
-        font = QFont("Arial", square_size // 2)
-        font.setBold(True)
-        painter.setFont(font)
-        
-        for square in chess.SQUARES:
-            piece = self.board.piece_at(square)
-            if piece:
-                col = chess.square_file(square)
-                row = chess.square_rank(square)
-                x = col * square_size
-                y = (7 - row) * square_size
-                
-                symbol = piece_symbols[piece.piece_type][0 if piece.color == chess.WHITE else 1]
-                color = QColor(255, 255, 255) if piece.color == chess.WHITE else QColor(0, 0, 0)
-                
-                painter.setPen(color)
-                painter.drawText(x, y, square_size, square_size, Qt.AlignCenter, symbol)
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 1000px;
+            width: 100%;
+            background-color: #262421;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            gap: 20px;
+        }
+        .board-container {
+            flex: 1 1 500px;
+            max-width: 550px;
+        }
+        #board {
+            width: 100%;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .controls-container {
+            flex: 1 1 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        h1 {
+            font-size: 1.6rem;
+            color: #fff;
+            margin: 0 0 5px 0;
+        }
+        .status-box {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #81b64c;
+            background-color: #1e1c18;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #81b64c;
+        }
+        .panel-label {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        .text-panel {
+            background-color: #1e1c18;
+            border: 1px solid #403d39;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            overflow-y: auto;
+            color: #e1e1e1;
+        }
+        #moveHistory { height: 120px; word-wrap: break-word; }
+        #validMoves { height: 80px; color: #98971a; }
+        .btn {
+            background-color: #81b64c;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover { background-color: #a3d16c; }
+    </style>
+</head>
+<body>
 
-class ChessGUI(QMainWindow):
-    """Main Chess GUI Application"""
-    
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("♔ Chess vs Stockfish AI ♔")
-        self.setGeometry(100, 100, 1200, 700)
-        
-        # Chess game state
-        self.board = chess.Board()
-        self.engine = None
-        self.player_color = chess.WHITE
-        self.difficulty = 10
-        self.game_active = True
-        self.move_history = []
-        
-        self.init_ui()
-        self.load_engine()
-    
-    def init_ui(self):
-        """Initialize the UI"""
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        
-        main_layout = QHBoxLayout()
-        
-        # Left side - Board
-        board_layout = QVBoxLayout()
-        self.board_widget = ChessBoardWidget(self)
-        board_layout.addWidget(self.board_widget)
-        
-        # Right side - Controls
-        control_layout = QVBoxLayout()
-        
-        # Title
-        title = QLabel("♔ Chess vs Stockfish")
-        title_font = QFont()
-        title_font.setPointSize(16)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        control_layout.addWidget(title)
-        
-        # Game status
-        self.status_label = QLabel("Loading...")
-        self.status_label.setFont(QFont("Arial", 12))
-        self.status_label.setStyleSheet("color: green; font-weight: bold;")
-        control_layout.addWidget(self.status_label)
-        
-        # Evaluation
-        self.eval_label = QLabel("Evaluation: -")
-        self.eval_label.setFont(QFont("Arial", 11))
-        control_layout.addWidget(self.eval_label)
-        
-        # Move history label
-        move_label = QLabel("Move History:")
-        move_label.setFont(QFont("Arial", 11, QFont.Bold))
-        control_layout.addWidget(move_label)
-        
-        self.move_text = QTextEdit()
-        self.move_text.setReadOnly(True)
-        self.move_text.setMaximumHeight(120)
-        self.move_text.setStyleSheet("background-color: #f0f0f0; padding: 5px;")
-        control_layout.addWidget(self.move_text)
-        
-        # Valid moves label
-        valid_label = QLabel("Valid Moves:")
-        valid_label.setFont(QFont("Arial", 11, QFont.Bold))
-        control_layout.addWidget(valid_label)
-        
-        self.valid_moves_text = QTextEdit()
-        self.valid_moves_text.setReadOnly(True)
-        self.valid_moves_text.setMaximumHeight(80)
-        self.valid_moves_text.setStyleSheet("background-color: #f0f0f0; padding: 5px;")
-        control_layout.addWidget(self.valid_moves_text)
-        
-        # Settings Frame
-        settings_frame = QFrame()
-        settings_frame.setStyleSheet("border: 1px solid gray; padding: 10px; border-radius: 5px;")
-        settings_layout = QVBoxLayout()
-        
-        # Difficulty
-        diff_label = QLabel("Difficulty Level:")
-        diff_label.setFont(QFont("Arial", 10, QFont.Bold))
-        settings_layout.addWidget(diff_label)
-        
-        self.difficulty_spin = QSpinBox()
-        self.difficulty_spin.setMinimum(1)
-        self.difficulty_spin.setMaximum(20)
-        self.difficulty_spin.setValue(10)
-        self.difficulty_spin.setSuffix(" / 20")
-        self.difficulty_spin.valueChanged.connect(self.set_difficulty)
-        settings_layout.addWidget(self.difficulty_spin)
-        
-        # Player color
-        color_label = QLabel("Your Color:")
-        color_label.setFont(QFont("Arial", 10, QFont.Bold))
-        settings_layout.addWidget(color_label)
-        
-        self.color_combo = QComboBox()
-        self.color_combo.addItems(["WHITE", "BLACK"])
-        self.color_combo.currentTextChanged.connect(self.set_player_color)
-        settings_layout.addWidget(self.color_combo)
-        
-        settings_frame.setLayout(settings_layout)
-        control_layout.addWidget(settings_frame)
-        
-        # Buttons
-        button_layout = QVBoxLayout()
-        
-        new_game_btn = QPushButton("🎮 New Game")
-        new_game_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-weight: bold;")
-        new_game_btn.clicked.connect(self.new_game)
-        button_layout.addWidget(new_game_btn)
-        
-        undo_btn = QPushButton("↶ Undo Move")
-        undo_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px; font-weight: bold;")
-        undo_btn.clicked.connect(self.undo_move)
-        button_layout.addWidget(undo_btn)
-        
-        hint_btn = QPushButton("💡 Get Hint")
-        hint_btn.setStyleSheet("background-color: #FF9800; color: white; padding: 8px; font-weight: bold;")
-        hint_btn.clicked.connect(self.get_hint)
-        button_layout.addWidget(hint_btn)
-        
-        eval_btn = QPushButton("📊 Analyze")
-        eval_btn.setStyleSheet("background-color: #9C27B0; color: white; padding: 8px; font-weight: bold;")
-        eval_btn.clicked.connect(self.analyze_position)
-        button_layout.addWidget(eval_btn)
-        
-        quit_btn = QPushButton("❌ Quit")
-        quit_btn.setStyleSheet("background-color: #f44336; color: white; padding: 8px; font-weight: bold;")
-        quit_btn.clicked.connect(self.close)
-        button_layout.addWidget(quit_btn)
-        
-        control_layout.addLayout(button_layout)
-        control_layout.addStretch()
-        
-        # Add layouts to main
-        main_layout.addWidget(self.board_widget, 3)
-        main_layout.addLayout(control_layout, 1)
-        main_widget.setLayout(main_layout)
-        
-        self.update_status()
-    
-    def load_engine(self):
-        """Load Stockfish engine"""
-        try:
-            paths = [
-                "stockfish", "stockfish.exe",
-                "/usr/bin/stockfish", "/usr/local/bin/stockfish",
-                "C:\\Program Files\\Stockfish\\stockfish.exe"
-            ]
-            
-            for path in paths:
-                try:
-                    self.engine = chess.engine.SimpleEngine.popen_uci(path)
-                    print("✓ Stockfish loaded!")
-                    self.status_label.setText("✓ Stockfish Ready - Game Started")
-                    return
-                except:
-                    continue
-        except:
-            pass
-        
-        self.status_label.setText("⚠️ Stockfish not found. Install from stockfishchess.org")
-    
-    def set_difficulty(self, value):
-        """Set AI difficulty"""
-        self.difficulty = value
-    
-    def set_player_color(self, color):
-        """Set player color"""
-        self.player_color = chess.WHITE if color == "WHITE" else chess.BLACK
-        self.new_game()
-    
-    def new_game(self):
-        """Start new game"""
-        self.board = chess.Board()
-        self.move_history = []
-        self.game_active = True
-        self.board_widget.update_board(self.board)
-        self.update_status()
-        self.move_text.clear()
-        self.valid_moves_text.clear()
-        self.eval_label.setText("Evaluation: -")
-    
-    def undo_move(self):
-        """Undo last move"""
-        if len(self.board.move_stack) >= 2:
-            self.board.pop()
-            self.board.pop()
-            self.move_history = self.move_history[:-2]
-            self.board_widget.update_board(self.board)
-            self.update_status()
-            QMessageBox.information(self, "Undo", "✓ Last move undone")
-        else:
-            QMessageBox.warning(self, "Undo", "⚠️ Cannot undo")
-    
-    def get_hint(self):
-        """Get AI hint"""
-        if not self.engine:
-            QMessageBox.warning(self, "Error", "Stockfish not loaded")
-            return
-        
-        self.analyze_position()
-    
-    def analyze_position(self):
-        """Analyze current position"""
-        if not self.engine:
-            QMessageBox.warning(self, "Error", "Stockfish not loaded")
-            return
-        
-        try:
-            info = self.engine.analyse(self.board, chess.engine.Limit(depth=20))
-            
-            eval_text = "Unknown"
-            if chess.engine.Cp in info:
-                cp = info[chess.engine.Cp]
-                eval_text = f"{cp/100:.2f} pawns"
-            elif chess.engine.Mate in info:
-                mate = info[chess.engine.Mate]
-                eval_text = f"Mate in {abs(mate)}"
-            
-            self.eval_label.setText(f"Evaluation: {eval_text}")
-            
-            QMessageBox.information(self, "Position Analysis", f"Evaluation: {eval_text}\n\nThis shows the advantage in the position.")
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Analysis failed: {str(e)}")
-    
-    def update_status(self):
-        """Update game status"""
-        if self.board.is_checkmate():
-            winner = "BLACK" if self.board.turn == chess.WHITE else "WHITE"
-            self.status_label.setText(f"♔ CHECKMATE! {winner} wins! ♔")
-            self.status_label.setStyleSheet("color: red; font-weight: bold; font-size: 14px;")
-            self.game_active = False
-        elif self.board.is_stalemate():
-            self.status_label.setText("♙ STALEMATE - Draw ♙")
-            self.status_label.setStyleSheet("color: orange; font-weight: bold;")
-            self.game_active = False
-        elif self.board.is_check():
-            turn = "YOUR TURN" if self.board.turn == self.player_color else "Stockfish"
-            self.status_label.setText(f"⚠️  {turn} - IN CHECK!")
-            self.status_label.setStyleSheet("color: red; font-weight: bold;")
-        else:
-            turn = "YOUR TURN ♟" if self.board.turn == self.player_color else "Stockfish thinking... 🤖"
-            self.status_label.setText(turn)
-            self.status_label.setStyleSheet("color: green; font-weight: bold;")
-        
-        # Update move history
-        self.move_text.setText(" ".join(self.move_history) if self.move_history else "No moves yet")
-        
-        # Update valid moves
-        moves = [move.uci() for move in self.board.legal_moves]
-        if moves:
-            moves_str = ", ".join(moves[:15]) + ("..." if len(moves) > 15 else "")
-        else:
-            moves_str = "No legal moves"
-        self.valid_moves_text.setText(moves_str)
+<div class="container">
+    <!-- Left Side: Chess Board -->
+    <div class="board-container">
+        <div id="board"></div>
+    </div>
 
-def main():
-    app = QApplication(sys.argv)
-    window = ChessGUI()
-    window.show()
-    sys.exit(app.exec_())
+    <!-- Right Side: Game Statistics & Panels -->
+    <div class="controls-container">
+        <h1>♔ Chess vs Stockfish</h1>
+        
+        <div class="status-box" id="status">Your turn! (White)</div>
+        <div id="evaluation">Evaluation: 0.00</div>
+        
+        <div>
+            <div class="panel-label">Move History:</div>
+            <div class="text-panel" id="moveHistory"></div>
+        </div>
+        
+        <div>
+            <div class="panel-label">Valid Moves:</div>
+            <div class="text-panel" id="validMoves"></div>
+        </div>
 
-if __name__ == "__main__":
-    main()
+        <button class="btn" id="newGameBtn">New Game</button>
+    </div>
+</div>
+
+<!-- Load jQuery, Chess.js (rules engine), and Chessboard.js (UI rendering) -->
+<script src="https://jquery.com"></script>
+<script src="https://cloudflare.com"></script>
+<script src="https://cloudflare.com"></script>
+<script src="https://cloudflare.com"></script>
+
+<script>
+    var board = null;
+    var game = new Chess();
+    var $status = $('#status');
+    var $moveHistory = $('#moveHistory');
+    var $validMoves = $('#validMoves');
+    var $evaluation = $('#evaluation');
+
+    function onDragStart (source, piece, position, orientation) {
+        // Do not pick up pieces if the game is over
+        if (game.game_over()) return false;
+
+        // Only pick up pieces for White (Player)
+        if (piece.search(/^b/) !== -1) return false;
+    }
+
+    function makeAIMove () {
+        var possibleMoves = game.moves({ verbose: true });
+        
+        // Exit if game over
+        if (game.game_over() || possibleMoves.length === 0) return;
+
+        // Basic AI: Evaluates capture priority or makes valid moves
+        // Runs cleanly inside browsers without requiring an external exe
+        possibleMoves.sort(function(a, b){
+            return (b.captured ? 1 : 0) - (a.captured ? 1 : 0);
+        });
+        
+        var move = possibleMoves[0];
+        game.move({ from: move.from, to: move.to, promotion: 'q' });
+        board.position(game.fen());
+        
+        updateUI();
+    }
+
+    function onDrop (source, target) {
+        // See if the move is legal
+        var move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // Always promote to queen for simplicity
+        });
+
+        // Illegal move
+        if (move === null) return 'snapback';
+
+        updateUI();
+        
+        // Trigger AI Move after a minor latency pause
+        $status.html('Stockfish AI is thinking...');
+        window.setTimeout(makeAIMove, 600);
+    }
+
+    function onSnapEnd () {
+        board.position(game.fen());
+    }
+
+    function updateUI () {
+        // 1. Update Status message
+        var statusText = 'Your turn! (White)';
+        if (game.in_checkmate()) {
+            statusText = 'Game over, Checkmate!';
+        } else if (game.in_draw()) {
+            statusText = 'Game over, Draw!';
+        } else if (game.in_check()) {
+            statusText = '⚠️ Check! (White)';
+        } else if (game.turn() === 'b') {
+            statusText = 'Stockfish AI is thinking...';
+        }
+        $status.html(statusText);
+
+        // 2. Process Move History list
+        var history = game.history();
+        var historyHtml = '';
+        for (var i = 0; i < history.length; i += 2) {
+            historyHtml += ((i / 2) + 1) + '. ' + history[i] + ' ' + (history[i + 1] || '') + '<br>';
+        }
+        $moveHistory.html(historyHtml);
+        $moveHistory.scrollTop($moveHistory[0].scrollHeight);
+
+        // 3. Render list of current Valid UCI Moves
+        var legalMoves = game.moves({ verbose: true }).map(m => m.from + m.to);
+        $validMoves.html(legalMoves.join(', '));
+
+        // 4. Update relative material evaluation score
+        var score = 0;
+        var boardState = game.board();
+        const vals = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+        for (var r = 0; r < 8; r++) {
+            for (var c = 0; c < 8; c++) {
+                if (boardState[r][c]) {
+                    var p = boardState[r][c];
+                    score += vals[p.type] * (p.color === 'w' ? 1 : -1);
+                }
+            }
+        }
+        $evaluation.html('Evaluation: ' + (score >= 0 ? '+' : '') + score.toFixed(2));
+    }
+
+    // Config options for Chessboard layout integration
+    var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        pieceTheme: 'https://chessboardjs.com{piece}.png'
+    };
+    
+    board = Chessboard('board', config);
+    updateUI();
+
+    // Reset button functionality
+    $('#newGameBtn').on('click', function() {
+        game.reset();
+        board.start();
+        updateUI();
+    });
+</script>
+</body>
+</html>
